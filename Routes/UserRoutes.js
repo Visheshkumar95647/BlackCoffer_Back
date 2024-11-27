@@ -5,7 +5,8 @@ const jwt = require("jsonwebtoken");
 const router = express.Router();
 const VeryifyToken = require("../middleware");
 const ProductSchema = require("../Models/Product");
-
+const dotenv = require("dotenv");
+dotenv.config();
 const multer = require("multer");
 const VerifyToken = require("../middleware");
 const storage = multer.diskStorage({
@@ -66,7 +67,7 @@ router.post("/register", upload.single("image"), async (req, res) => {
       {
         id: user._id,
       },
-      "Vishesh@123",
+      process.env.KEY,
       {
         expiresIn: "24h",
       }
@@ -97,7 +98,7 @@ router.post("/login", async (req, res) => {
         id: getuser._id,
       },
     };
-    const authToken = jwt.sign(data, "Vishesh@123");
+    const authToken = jwt.sign(data, process.env.KEY);
     return res.status(200).json({ token: authToken });
   } catch (error) {
     return res.status(500).json({ error: "Internal server error" });
@@ -184,7 +185,9 @@ router.get("/search/user", VerifyToken, async (req, res) => {
     const userid = req.user.id;
     const keyword = req.query.search
       ? {
-          $or: [{ username: { $regex: req.query.search, $options: "i" } }],
+          $or: [{ username: { $regex: req.query.search, $options: "i" } },
+            {name : {$regex : req.query.search,$options : "i"}}
+          ],
         }
       : {};
       //if req.query.search exists than it matched with username whether any username exist or not.if not than it send empty keyword

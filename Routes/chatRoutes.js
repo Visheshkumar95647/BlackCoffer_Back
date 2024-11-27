@@ -5,9 +5,9 @@ const Chat = require("../Models/ChatModel");
 const User = require("../Models/UserSchema");
 
 // Create or fetch a chat
-router.post("/chat/:id", async (req, res) => {
+router.post("/createchat/:id", VerifyToken ,  async (req, res) => {
   const userid = req.params.id;
-
+  const loginUserid = req.user.id;
   if (!userid) {
     return res.status(400).json({ message: "UserId parameter not provided" });
   }
@@ -17,7 +17,7 @@ router.post("/chat/:id", async (req, res) => {
     let chat = await Chat.findOne({
       isGroup: false, // as one and one chat
       $and: [
-        { users: { $elemMatch: { $eq: "66ab59ca7deb76500e08c2dc" } } },
+        { users: { $elemMatch: { $eq: loginUserid } } },
         { users: { $elemMatch: { $eq: userid } } },
       ],
       // here we find that is any chat exist where these two user present
@@ -26,7 +26,7 @@ router.post("/chat/:id", async (req, res) => {
       //   "_id": "chatId1",
       //   "chatName": "Chat Room",
       //   "isGroup": false,
-      //   "users": ["66ab59ca7deb76500e08c2dc", "userid123"],
+      //   "users": [loginUserid, "userid123"],
       //   "latestMessage": "messageId1", // The ID of the latest message
       //   "groupAdmin": "someUserId",
       //   "createdAt": "2024-10-05T12:00:00Z",
@@ -60,9 +60,9 @@ router.post("/chat/:id", async (req, res) => {
     } else {
       // Create a new chat if it doesn't exist
       const chatData = {
-        chatName: "sender",
+        chatName: req.body.chatName,
         isGroup: false,
-        users: ["66ab59ca7deb76500e08c2dc", userid],
+        users: [loginUserid, userid],
       };
 
       const createdChat = await Chat.create(chatData);
@@ -83,9 +83,10 @@ router.post("/chat/:id", async (req, res) => {
 // Uncomment and complete the following routes as needed
 
 //Get All Chats
-router.get("/allchats", async (req, res) => {
+router.get("/allchats",VerifyToken, async (req, res) => {
+  const loginUserid = req.user.id;
   try {
-    Chat.find({ users: { $elemMatch : { $eq: "66ab59ca7deb76500e08c2dc" }} })
+    Chat.find({ users: { $elemMatch : { $eq: loginUserid }} })
       .populate("users", "-password")
       .populate("groupAdmin", "-password")
       .populate("latestMessage")
@@ -104,136 +105,139 @@ router.get("/allchats", async (req, res) => {
 });
 
 //Group Creation
-router.post("/group", async (req, res) => {
-  if (!req.body.users || !req.body.name) {
-    return res.status(400).send({ message: "Please Fill All The Fields" });
-  }
-  var users = JSON.parse(req.body.users);
-  if (users.length < 2) {
-    return res
-      .status(400)
-      .send({ message: "More Than Two Users Are Required" });
-  }
+// router.post("/group",VerifyToken, async (req, res) => {
+//   if (!req.body.users || !req.body.chatName) {
+//     return res.status(400).send({ message: "Please Fill All The Fields" });
+//   }
+//   var users = JSON.parse(req.body.users);
+//   //if length is less than 2 means its 1 so its an one to one chat there is no use of grp chat
+//   if (users.length <= 2) {
+//     return res
+//       .status(400)
+//       .send({ message: "More Than Two Users Are Required" });
+//   }
 
-  users.push(req.user);
-  //current user that looged in.
+//   // users.push(req.user);
+//   //current user that looged in.
 
-  try {
-    const groupChat = await Chat.create({
-      chatName: req.body.name,
-      users: users,
-      isGroup: true,
-      groupAdmin: req.user,
-    });
-    //fetching this grp chat and send to user
-    const fullGroupChat = await Chat.findOne({ _id: groupChat._id })
-      .populate("users", "-password")
-      .populate("groupAdmin", "-password");
+//   try {
+//     const groupChat = await Chat.create({
+//       chatName: req.body.chatName,
+//       users: users,
+//       isGroup: true,
+//       groupAdmin: req.user._id,
+//     });
+//     //fetching this grp chat and send to user
+//     const fullGroupChat = await Chat.findOne({ _id: groupChat._id })
+//       .populate("users", "-password")
+//       .populate("groupAdmin", "-password");
 
-    res.status(200).json(fullGroupChat);
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Server error occurred" });
-  }
-});
+//     res.status(200).json(fullGroupChat);
+//   } catch (error) {
+//     console.error(error);
+//     return res.status(500).json({ message: "Server error occurred" });
+//   }
+// });
 
  
-router.put("/grouprename/:id", VerifyToken, async (req, res) => {
-  try {
-    const chatId = req.params.id;
-    const { chatName } = req.body;
+// router.put("/grouprename/:id", VerifyToken, async (req, res) => {
+//   try {
+//     const chatId = req.params.id;
+//     const { chatName } = req.body;
 
-    // Fetch the chat to check the group admin
-    const chat = await Chat.findById(chatId);
+//     // Fetch the chat to check the group admin
+//     const chat = await Chat.findById(chatId);
 
-    if (!chat) {
-      return res.status(404).json({ error: "Chat not found" });
-    }
+//     if (!chat) {
+//       return res.status(404).json({ error: "Chat not found" });
+//     }
 
-    // Verify if the current user is the group admin
-    const currentUserId = req.user._id; // Assuming you attach the current user from the VerifyToken middleware
-    if (chat.groupAdmin.toString() !== currentUserId.toString()) {
-      return res.status(403).json({ error: "Only group admin can rename the group" });
-    }
+//     // Verify if the current user is the group admin
+//     const currentUserId = req.user._id; // Assuming you attach the current user from the VerifyToken middleware
+//     if (chat.groupAdmin.toString() !== currentUserId.toString()) {
+//       return res.status(403).json({ error: "Only group admin can rename the group" });
+//     }
 
-    // Proceed to rename the group
-    chat.chatName = chatName;
-    const updatedChat = await chat.save();
+//     // Proceed to rename the group
+//     chat.chatName = chatName;
+//     const updatedChat = await chat.save();
 
-    // Populate related fields (users, groupAdmin) before sending the response
-    await updatedChat
-      .populate("users", "-password")
-      .populate("groupAdmin", "-password")
-      .execPopulate();
+//     // Populate related fields (users, groupAdmin) before sending the response
+//     await updatedChat
+//       .populate("users", "-password")
+//       .populate("groupAdmin", "-password")
+//       .execPopulate();
 
-    res.json(updatedChat);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-
-//Remove User From Group
-router.put("/groupremove/:id", VerifyToken, async (req, res) => {
-  const { userRemove } = req.body;
-  const chatId = req.params.id;
-  const chat = await Chat.findById(chatId);
-
-  if (chat.groupAdmin.toString() !== currentUserId.toString()) {
-    return res.status(403).json({ error: "Only group admin can remove from the group" });
-  }
-
-  const userToremove = await User.find({ userRemove });
-  const removeUser = await Chat.findById(
-    chatId,
-    {
-      $pull: { users: userToremove._id },
-    },
-    {
-      new: true,
-    }
-  )
-    .populate("users", "-password")
-    .populate("groupAdmin", "-password");
-  if (!removeUser) {
-    res.status(404);
-    throw new Erorr("User Not Found");
-  } else {
-    res.json(removeUser);
-  }
-});
+//     res.json(updatedChat);
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({ error: "Server error" });
+//   }
+// });
 
 
-//Add user to Group
-router.put("/groupadd/:id", VerifyToken, async (req, res) => {
-  const { userAdd } = req.body;
-  const chatId = req.params.id;
+// //Remove User From Group
+// router.put("/groupremove/:id", VerifyToken, async (req, res) => {
+//   const { userRemove } = req.body;
+//   const chatId = req.params.id;
+//   const chat = await Chat.findById(chatId);
 
-  const chat = await Chat.findById(chatId);
+//   if (chat.groupAdmin.toString() !== currentUserId.toString()) {
+//     return res.status(403).json({ error: "Only group admin can remove from the group" });
+//   }
 
-  if (chat.groupAdmin.toString() !== currentUserId.toString()) {
-    return res.status(403).json({ error: "Only group admin can add user to the group" });
-  }
+//   const userToremove = await User.find({ userRemove });
+//   const removeUser = await Chat.findById(
+//     chatId,
+//     {
+//       $pull: { users: userToremove._id },
+//     },
+//     {
+//       new: true,
+//     }
+//   )
+//     .populate("users", "-password")
+//     .populate("groupAdmin", "-password");
+//   if (!removeUser) {
+//     res.status(404);
+//     throw new Erorr("User Not Found");
+//   } else {
+//     res.json(removeUser);
+//   }
+// });
 
-  const userToAdd = await User.find({ userAdd });
-  const addUser = await Chat.findbyIdAndUpdate(
-    chatId,
-    {
-      $push: { users: userToAdd._id },
-    },
-    {
-      new: true,
-    }
-  )
-    .populate("users", "-password")
-    .populate("groupAdmin", "-password");
-  if (!addUser) {
-    res.status(404);
-    throw new Erorr("User Not Found");
-  } else {
-    res.json(addUser);
-  }
-});
+
+// //Add user to Group
+// router.put("/groupadd/:id", VerifyToken, async (req, res) => {
+//   const { userAdd } = req.body;
+//   const chatId = req.params.id;
+
+//   const chat = await Chat.findById(chatId);
+
+//   if (chat.groupAdmin.toString() !== currentUserId.toString()) {
+//     return res.status(403).json({ error: "Only group admin can add user to the group" });
+//   }
+
+//   const userToAdd = await User.find({ userAdd });
+//   const addUser = await Chat.findbyIdAndUpdate(
+//     chatId,
+//     {
+//       $push: { users: userToAdd._id },
+//     },
+//     {
+//       new: true,
+//     }
+//   )
+//     .populate("users", "-password")
+//     .populate("groupAdmin", "-password");
+//   if (!addUser) {
+//     res.status(404);
+//     throw new Erorr("User Not Found");
+//   } else {
+//     res.json(addUser);
+//   }
+// });
+
+
 
 module.exports = router;

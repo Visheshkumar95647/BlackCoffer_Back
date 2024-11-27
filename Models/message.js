@@ -4,10 +4,10 @@ const MessageSchema = mongoose.Schema({
     sender: {
         // this means this contain _id of sender
         type: mongoose.Schema.Types.ObjectId,
-        ref: "userdata",
+        ref: "userData",
         required: true
     },
-    chat: {
+    chatId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Chat",
         required: true
